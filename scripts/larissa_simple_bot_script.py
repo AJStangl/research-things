@@ -18,7 +18,41 @@ from azure.storage.queue import QueueMessage, QueueServiceClient, TextBase64Enco
 from diffusers import StableDiffusionPipeline
 from praw import Reddit
 from praw.exceptions import RedditAPIException
+from praw.reddit import Submission
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
+
+logging.getLogger("diffusers").setLevel(logging.WARNING)
+logging.getLogger("azure.storage").setLevel(logging.WARNING)
+
+
+class FuckingStatic:
+	@staticmethod
+	def create_image(prompt: str, pipe: StableDiffusionPipeline, device_name: str) -> (str, int, int):
+		try:
+			pipe.to("cuda:" + device_name)
+			guidance_scale = random.randint(5, 20)
+			num_inference_steps = random.randint(50, 200)
+			args = {
+				"model": pipe.config_name,
+				"guidance_scale": guidance_scale,
+				"num_inference_steps": num_inference_steps
+			}
+
+			print(json.dumps(args, indent=4))
+
+			image = pipe(prompt, height=512, width=512, guidance_scale=guidance_scale,
+						 num_inference_steps=num_inference_steps).images[0]
+			hash_name = f"{hashlib.md5(prompt.encode()).hexdigest()}"
+			upload_file = f"{hash_name}.png"
+			image_path = f"D://images//{upload_file}"
+			image.save(image_path)
+			return upload_file, guidance_scale, num_inference_steps
+		except Exception as e:
+			print(e)
+			return None
+		finally:
+			del pipe
+			torch.cuda.empty_cache()
 
 
 class BlobBroker(object):
@@ -84,15 +118,24 @@ class MessageBroker(object):
 		return self.service.delete_queue(queue_name)
 
 
-class ProcessManager(threading.Thread):
-	def __init__(self, proc_name: str):
+class PipeLineHolder(object):
+	pipe_line_name: str
+	diffusion_pipeline_path: str
+
+	def __init__(self, pipe_line_name: str, diffusion_pipeline_path: str):
+		self.pipe_line_name: str = pipe_line_name
+		self.diffusion_pipeline_path: str = diffusion_pipeline_path
+
+
+class WebManager(threading.Thread):
+	def __init__(self, holder: [PipeLineHolder, PipeLineHolder], proc_name: str):
 		super().__init__(name=proc_name, daemon=True)
 		self.message_broker_instance: MessageBroker = MessageBroker()
 		self.poll_for_message_worker_thread = threading.Thread(target=self.poll_for_reply_queue, args=(), daemon=True,
 															   name=proc_name)
+		self.holders: [PipeLineHolder, PipeLineHolder] = holder
 
-	@staticmethod
-	def reply_to_thing(q: dict):
+	def reply_to_thing(self, q: dict):
 		message_broker_instance = MessageBroker()
 		print(f"Got reply: {q}")
 		data_dict = q
@@ -106,10 +149,17 @@ class ProcessManager(threading.Thread):
 		out_queue = data_dict.get("ConnectionId")
 		reply = None
 		try:
-			sd_pipeline = StableDiffusionPipeline.from_pretrained("D:\\models\\SexyDiffusion-V2", revision="fp16",
-																  torch_dtype=torch.float16, safety_checker=None)
+			current_holder: PipeLineHolder = random.choice(self.holders)
+			model = StableDiffusionPipeline.from_pretrained(current_holder.diffusion_pipeline_path, revision="fp16",
+															torch_dtype=torch.float16, safety_checker=None)
 
-			output_images = SimpleBot.create_image(prompt, sd_pipeline, "0")
+			output_images, guidance, num_steps = FuckingStatic.create_image(prompt, model, "0")
+			prompt = prompt + " " + "-model-name-" + current_holder.pipe_line_name + " " + "-num-steps-" + str(
+				num_steps) + " " + "-guidance-" + str(guidance)
+
+			torch.cuda.empty_cache()
+			del model
+
 			if output_images is not None:
 				local_path = f"D://images//{output_images}"
 				with open(local_path, "rb") as f:
@@ -119,7 +169,8 @@ class ProcessManager(threading.Thread):
 					reply = final_remote_path
 					print(final_remote_path)
 		except Exception as e:
-			print(f"Error generating reply: {e}")
+			del model
+			print(f":: Error generating reply: {e}")
 			reply = "I'm sorry, I'm not feeling well today. I'll be back later."
 			pass
 
@@ -137,10 +188,11 @@ class ProcessManager(threading.Thread):
 			}
 		)
 		try:
-			print(f"Sending reply: {out_put}")
+			print(f":: Sending reply: {out_put}")
 			message_broker_instance.put_message(out_queue, out_put)
-		except:
-			print(f"Error putting message on queue: {out_queue}")
+		except Exception as e:
+			print(f":: Error putting message on queue: {e}")
+			print(f":: Error putting message on queue: {out_queue}")
 
 	def poll_for_reply_queue(self):
 		while True:
@@ -148,12 +200,14 @@ class ProcessManager(threading.Thread):
 				message: QueueMessage = self.message_broker_instance.get_message("chat-input")
 				if message is not None:
 					q = json.loads(message.content)
-					p = Process(target=self.reply_to_thing, args=(q,), daemon=True)
-					p.start()
+					self.reply_to_thing(q)
 					self.message_broker_instance.delete_message("chat-input", message)
-					p.join()
+					time.sleep(1)
+			except Exception as e:
+				print(f":: Error polling for reply queue: {e}")
+				pass
 			finally:
-				time.sleep(10)
+				pass
 
 	def run(self):
 		self.poll_for_message_worker_thread.start()
@@ -163,25 +217,15 @@ class ProcessManager(threading.Thread):
 
 
 class SimpleBot(threading.Thread):
-	def __init__(self, proc_name: str, stable_diffusion_model):
+	def __init__(self, holder: [PipeLineHolder, PipeLineHolder], proc_name: str):
 		super().__init__(name=proc_name, daemon=True)
 		self.language_model_path = "D:\\models\\sexy-prompt-bot"
 		self.tokenizer = GPT2Tokenizer.from_pretrained(self.language_model_path)
 		self.model = GPT2LMHeadModel.from_pretrained(self.language_model_path)
-		self.sd_pipeline = stable_diffusion_model
+		self.holders: [PipeLineHolder, PipeLineHolder] = holder
 		self.table_broker: TableBroker = TableBroker()
 		self.poll_for_message_worker_thread = threading.Thread(target=self.main_process, args=(), daemon=True, name=proc_name)
 		self.things_to_say: [str] = []
-
-	@staticmethod
-	def create_image(prompt: str, sd_pipeline: StableDiffusionPipeline, device: str) -> str:
-		sd_pipeline.to("cuda:" + device)
-		image = sd_pipeline(prompt, height=512, width=512, guidance_scale=10, num_inference_steps=90).images[0]
-		hash_name = f"{hashlib.md5(prompt.encode()).hexdigest()}"
-		upload_file = f"{hash_name}.png"
-		image_path = f"D://images//{upload_file}"
-		image.save(image_path)
-		return upload_file
 
 	def create_prompt(self):
 		if len(self.things_to_say) > 0:
@@ -218,7 +262,7 @@ class SimpleBot(threading.Thread):
 											attention_mask=attention_mask,
 											do_sample=True,
 											max_length=50,
-											num_return_sequences=1000,
+											num_return_sequences=2,
 											repetition_penalty=1.1)
 
 			for i, sample_output in enumerate(sample_outputs):
@@ -227,6 +271,10 @@ class SimpleBot(threading.Thread):
 					continue
 				else:
 					self.things_to_say.append(result)
+
+			model.to("cpu")
+			generation_prompt.to("cpu")
+			torch.cuda.empty_cache()
 
 			random.shuffle(self.things_to_say)
 			return self.things_to_say.pop()
@@ -262,23 +310,39 @@ class SimpleBot(threading.Thread):
 		TableBroker().write_to_table(table_name="messages", entity=entity)
 
 	def main_process(self):
+		counter = 1
 		while True:
+			model_index = counter % 2
+			holder: PipeLineHolder = self.holders[model_index]
+			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16",
+														   torch_dtype=torch.float16, safety_checker=None)
+
 			image_prompt: str = self.create_prompt()
 			print("Prompt: " + image_prompt)
-			image_output: str = self.create_image(image_prompt, sd_model, "1")
+			(image_output, guidance, num_steps) = FuckingStatic.create_image(image_prompt, pipe, "1")
 			remote_path: str = self.write_image_to_cloud(image_output)
 			bot.write_output_to_table_storage_row(remote_path, image_prompt)
 
 			try:
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
-				print(instance.user.me())
 				sub = instance.subreddit("CoopAndPabloArtHouse")
-				print(sub)
-				sub.submit_image(title=image_prompt, image_path=f"D://images//{image_output}", nsfw=True)
+				submission: Submission = sub.submit_image(
+					title=f"{image_prompt}",
+					image_path=f"D://images//{image_output}", nsfw=True)
+
+				submission.mod.approve()
+				body = f"""
+| Prompt         |       Model Name        | Guidance   | Number Of Inference Steps |
+|:---------------|:-----------------------:|------------|--------------------------:|
+| {image_prompt} | {holder.pipe_line_name} | {guidance} |               {num_steps} |
+				"""
+				print(body)
+				submission.reply(body)
+
 			except Exception as e:
 				print(e)
 				continue
-			time.sleep(60)
+			time.sleep(5)
 
 	def run(self):
 		self.poll_for_message_worker_thread.start()
@@ -288,13 +352,16 @@ class SimpleBot(threading.Thread):
 
 
 if __name__ == '__main__':
-	sd_model = StableDiffusionPipeline.from_pretrained("D:\\models\\SexyDiffusion-V2", revision="fp16",
-													   torch_dtype=torch.float16, safety_checker=None)
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2")
 
-	proc = ProcessManager(f"ProcessManager-1")
+	pipeline_2 = PipeLineHolder("SexyDiffusion2", "D:\\models\\SexyDiffusion2")
+
+	pipe_line_holder_list: [PipeLineHolder, PipeLineHolder] = [pipeline_1, pipeline_2]
+
+	proc = WebManager(pipe_line_holder_list, f"ProcessManager-1")
 	proc.start()
 
-	bot: SimpleBot = SimpleBot(sd_model, "SimpleBot-1")
+	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot-v2")
 	bot.start()
 
 	while True:
