@@ -32,3 +32,10 @@ training.txt
 /notebooks/train.txt
 /models/
 /diffusers/
+/notebooks/danger_books/
+/notebooks/models/
+/notebooks/nb_danger_books/apply-missing-data.ipynb
+/notebooks/nb_danger_books/fuck-around-find-out.ipynb
+/notebooks/nb_danger_books/image-organization.ipynb
+/notebooks/nb_danger_books/transer-scratch.ipynb
+/notebooks/nb_danger_books/

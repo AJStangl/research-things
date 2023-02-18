@@ -2,12 +2,11 @@ import hashlib
 import json
 import logging
 import random
+import threading
+from typing import Any
 
 import praw
 import sys
-import threading
-from multiprocessing import Process
-from typing import Any
 import time
 import torch
 from azure.core.paging import ItemPaged
@@ -17,7 +16,6 @@ from azure.storage.blob import BlobServiceClient
 from azure.storage.queue import QueueMessage, QueueServiceClient, TextBase64EncodePolicy, QueueProperties
 from diffusers import StableDiffusionPipeline
 from praw import Reddit
-from praw.exceptions import RedditAPIException
 from praw.reddit import Submission
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
@@ -96,8 +94,7 @@ class MessageBroker(object):
 
 	def __init__(self):
 		self.connection_string: str = "DefaultEndpointsProtocol=https;AccountName=ajdevreddit;AccountKey=+9066TCgdeVignRdy50G4qjmNoUJuibl9ERiTGzdV4fwkvgdV3aSVqgLwldgZxj/UpKLkkfXg+3k+AStjFI33Q==;BlobEndpoint=https://ajdevreddit.blob.core.windows.net/;QueueEndpoint=https://ajdevreddit.queue.core.windows.net/;TableEndpoint=https://ajdevreddit.table.core.windows.net/;FileEndpoint=https://ajdevreddit.file.core.windows.net/;"
-		self.service: QueueServiceClient = QueueServiceClient.from_connection_string(self.connection_string,
-																					 encode_policy=TextBase64EncodePolicy())
+		self.service: QueueServiceClient = QueueServiceClient.from_connection_string(self.connection_string, encode_policy=TextBase64EncodePolicy())
 
 	def put_message(self, queue_name: str, content: Any, time_to_live=None) -> QueueMessage:
 		if time_to_live is None:
