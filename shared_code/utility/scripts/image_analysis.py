@@ -1,21 +1,47 @@
 import logging
+from collections import OrderedDict
 
+import nltk
 import torch
+from nltk.tokenize import sent_tokenize
+from nltk import pos_tag, TweetTokenizer
 from PIL import Image
 from transformers import VisionEncoderDecoderModel, ViTFeatureExtractor, GPT2TokenizerFast, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
+
 class ImageCaption:
-	"""
-
-	"""
-
 	def __init__(self):
 		self.tokenizer = None
 		self.model = None
 		self.feature_extractor = None
 		self.device = torch.device("cpu")
+
+	def get_nlk_tokens(self, text: str):
+		try:
+			tokenizer = TweetTokenizer()
+
+			first_sentence = sent_tokenize(text)[0]
+
+			# remove numbers and tokenize the text
+			tokenized = tokenizer.tokenize(first_sentence.translate({ord(ch): None for ch in '0123456789'}))
+
+			tokenized = [i for i in tokenized if len(i) > 1]
+
+			tokenized = list(OrderedDict.fromkeys(tokenized))
+
+			pos_tagged_text = nltk.pos_tag(tokenized)
+
+			# Extract all nouns, verbs and adverbs and append to the existing
+			prompt_keywords = [i[0] for i in pos_tagged_text if i[1][:2] in ['NN', 'VB', 'RB']]
+
+			prompt_keywords = list(OrderedDict.fromkeys(prompt_keywords))
+
+			return prompt_keywords
+		except Exception as e:
+			logger.error(e)
+			return []
 
 	def get_vit_caption(self):
 		model = VisionEncoderDecoderModel.from_pretrained("/models/vit-gpt2-image-captioning")
@@ -35,9 +61,14 @@ class ImageCaption:
 		else:
 			self.model, self.feature_extractor, self.tokenizer = self.get_default_caption()
 
-	def caption_image(self, image_path: str) -> str:
+	def caption_image(self, image_path: str, number: int = 2) -> str:
+		current_device = number % 2
+		logger.info(f":: Current Device: {current_device}")
+		# self.device = torch.device(f"cuda:{current_device}")
+		self.device = torch.device(f"cpu")
 		try:
 			self.set_pipeline("default")
+			self.model.to(self.device)
 			img = Image.open(image_path)
 			if img.mode != 'RGB':
 				img = img.convert(mode="RGB")
@@ -58,11 +89,15 @@ class ImageCaption:
 		except Exception as e:
 			print(f"Error in caption_image: {e}")
 			return "Error in captioning image"
+		finally:
+			pass
 
-	def caption_image_vit(self, image_path: str) -> str:
+	def caption_image_vit(self, image_path: str, number: int = 2) -> str:
+		current_device = number % 2
+		logger.info(f":: Current Device: {current_device}")
+		self.device = torch.device(f"cpu")
 		try:
 			self.set_pipeline("vit")
-			self.device = torch.device("cpu")
 			self.model.to(self.device)
 
 			max_length = 32

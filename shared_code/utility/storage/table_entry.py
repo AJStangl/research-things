@@ -1,6 +1,5 @@
 from typing import Any
 from dataclasses import dataclass
-import json
 
 
 @dataclass
@@ -17,6 +16,11 @@ class TableEntry:
 	permalink: str
 	hash: str
 	caption: str
+	updated_caption: str
+	exists: bool
+	small_image: str
+	image_name: str
+	curated: bool
 
 	@staticmethod
 	def from_dict(obj: Any) -> 'TableEntry':
@@ -32,4 +36,10 @@ class TableEntry:
 		_permalink = str(obj.get("permalink"))
 		_hash = str(obj.get("hash"))
 		_caption = str(obj.get("caption"))
-		return TableEntry(_PartitionKey, _RowKey, _image, _text, _id, _author, _url, _subreddit, _flair, _permalink, _hash, _caption)
+		_exists = bool(obj.get("exists"))
+		_updated_caption = str(obj.get("updated_caption"))
+		_small_image = str(obj.get("small_image"))
+		_image_name = str(obj.get("image_name"))
+		_curated = bool(obj.get("curated"))
+		return TableEntry(_PartitionKey, _RowKey, _image, _text, _id, _author, _url, _subreddit, _flair, _permalink,
+						  _hash, _caption, _updated_caption, _exists, _small_image, _image_name, _curated)

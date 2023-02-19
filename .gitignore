@@ -39,3 +39,6 @@ training.txt
 /notebooks/nb_danger_books/image-organization.ipynb
 /notebooks/nb_danger_books/transer-scratch.ipynb
 /notebooks/nb_danger_books/
+/notebooks/cache/
+/scripts/utility/spark/set_environ.py
+/shared_code/utility/spark/set_environ.py
