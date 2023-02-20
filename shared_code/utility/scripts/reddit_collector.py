@@ -1,5 +1,4 @@
 import datetime
-import datetime
 import hashlib
 import logging
 import os
@@ -7,9 +6,7 @@ import os
 import PIL.Image
 import pandas
 import requests
-from azure.data.tables import TableClient
 
-from shared_code.utility.scripts.image_analysis import ImageCaption
 from shared_code.utility.storage.table import TableAdapter
 from shared_code.utility.storage.table_entry import TableEntry
 
@@ -22,8 +19,6 @@ class RedditDataCollector(object):
 		self.table_name: str = table_name
 		self.out_path: str = image_out_dir
 		self.table_adapter: TableAdapter = TableAdapter()
-		self.table_client: TableClient = self.table_adapter.get_table_client(table_name=table_name)
-		self.image_caption: ImageCaption = ImageCaption()
 		self.image_count: int = 0
 		self.hashes: [] = []
 		self.ids: [] = []
@@ -69,7 +64,9 @@ class RedditDataCollector(object):
 	def download_subreddit_images(self, subreddit, start_date="2023-01-01",
 								  end_date=datetime.datetime.today().strftime('%Y-%m-%d')):
 
-		all_current_images: list[dict] = list(self.table_client.list_entities())
+		table_client = self.table_adapter.get_table_client(self.table_name)
+
+		all_current_images: list[dict] = list(table_client.list_entities())
 
 		self.hashes = [x['hash'] for x in all_current_images]
 
@@ -81,7 +78,7 @@ class RedditDataCollector(object):
 
 		final_path = os.path.join(self.out_path, subreddit)
 
-		logging.info(f"== Starting {subreddit}==")
+		print(f"== Starting {subreddit} ==")
 		for start, end in self.loop_between_dates(start_date, end_date):
 			submission_search_link = ('https://api.pushshift.io/reddit/submission/search/'
 									  '?subreddit={}&after={}&before={}&stickied=0&limit={}&mod_removed=0')
@@ -91,7 +88,7 @@ class RedditDataCollector(object):
 			try:
 				data = submission_response.json()
 			except requests.exceptions.JSONDecodeError:
-				logging.error("Error decoding JSON")
+				print("Error decoding JSON")
 				continue
 
 			submissions = data.get('data')
@@ -106,7 +103,8 @@ class RedditDataCollector(object):
 			for submission in submissions:
 				self.handle_submission(submission, data, final_path)
 
-		logging.info(f"All images from {subreddit} subreddit are downloaded")
+		print(f"All images from {subreddit} subreddit are downloaded")
+		return self.image_count
 
 	def handle_submission(self, submission, data,
 						  final_path):  # note this is buggy if data is not present as a input to the method
@@ -145,13 +143,14 @@ class RedditDataCollector(object):
 						return
 					else:
 						self.hashes.append(md5)
-
+					table_client = self.table_adapter.get_table_client(self.table_name)
 					out_image = f"{final_path}/{image_name}"
 					try:
 						with open(out_image, "wb") as f:
 							f.write(content)
-							caption = self.image_caption.caption_image(out_image)
-							updated_caption = self.image_caption.caption_image_vit(out_image)
+
+							caption = None
+							updated_caption = None
 							small_image = self.get_resized_image(final_path, image_name)
 							entity = TableEntry(
 								PartitionKey='training',
@@ -173,10 +172,10 @@ class RedditDataCollector(object):
 								curated=False)
 
 							to_add = entity.__dict__
-							logging.info(to_add)
-							self.table_client.upsert_entity(entity=to_add)
+							# logging.info(to_add)
+							table_client.upsert_entity(entity=to_add)
 							self.image_count += 1
-							logging.info("File downloaded\t" + image_name + "\t" + "count\t" + str(self.image_count))
+							print("File downloaded\t" + image_name + "\t" + "count\t" + str(self.image_count))
 							return
 					except Exception as e:
 						logging.error(e)
@@ -195,7 +194,8 @@ class RedditDataCollector(object):
 			# {"file_name": "0003.png", "text": "One chihuahua"}
 		"""
 		# Filter and unsure the other process found the captions
-		all_current_images: list[dict] = list(self.table_client.list_entities("training"))
+		table_client = self.table_adapter.get_table_client(self.table_name)
+		all_current_images: list[dict] = list(table_client.list_entities("training"))
 
 		logging.info(f"Total Raw Images: {len(all_current_images)}")
 
@@ -272,20 +272,20 @@ class RedditDataCollector(object):
 			if not os.path.exists(out_path):
 				os.makedirs(out_path, exist_ok=True)
 			if os.path.exists(out_name):
-				logging.info(f"File {out_name} already exists. Skipping...")
+				print(f"File {out_name} already exists. Skipping...")
 				return out_name
 			else:
-				logging.info(f"Resizing image {original_path} to {out_name}...")
+				print(f"Resizing image {original_path} to {out_name}...")
 				try:
 					result = self.resize_image(original_path)
 					result.save(out_name)
 					result.close()
 					return out_name
 				except Exception as e:
-					logging.error(f"Error resizing image {original_path}...")
+					print(f"Error resizing image {original_path}...")
 					return ""
 		except Exception as e:
-			logging.info(f"Error resizing image {path}...")
+			print(f"Error resizing image {path}...{e}")
 			return ""
 		finally:
 			pass

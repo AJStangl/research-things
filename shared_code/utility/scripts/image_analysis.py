@@ -44,9 +44,9 @@ class ImageCaption:
 			return []
 
 	def get_vit_caption(self):
-		model = VisionEncoderDecoderModel.from_pretrained("/models/vit-gpt2-image-captioning")
-		feature_extractor = ViTFeatureExtractor.from_pretrained("/models/vit-gpt2-image-captioning")
-		tokenizer = AutoTokenizer.from_pretrained("/models/vit-gpt2-image-captioning")
+		model = VisionEncoderDecoderModel.from_pretrained("D:\\models\\models\\vit-gpt2-image-captioning")
+		feature_extractor = ViTFeatureExtractor.from_pretrained("D:\\models\\\\models\\vit-gpt2-image-captioning")
+		tokenizer = AutoTokenizer.from_pretrained("D:\\models\\vit-gpt2-image-captioning")
 		return model, feature_extractor, tokenizer
 
 	def get_default_caption(self):
@@ -61,10 +61,7 @@ class ImageCaption:
 		else:
 			self.model, self.feature_extractor, self.tokenizer = self.get_default_caption()
 
-	def caption_image(self, image_path: str, number: int = 2) -> str:
-		current_device = number % 2
-		logger.info(f":: Current Device: {current_device}")
-		# self.device = torch.device(f"cuda:{current_device}")
+	def caption_image(self, image_path: str) -> str:
 		self.device = torch.device(f"cpu")
 		try:
 			self.set_pipeline("default")
@@ -92,11 +89,9 @@ class ImageCaption:
 		finally:
 			pass
 
-	def caption_image_vit(self, image_path: str, number: int = 2) -> str:
-		current_device = number % 2
-		logger.info(f":: Current Device: {current_device}")
-		self.device = torch.device(f"cpu")
+	def caption_image_vit(self, image_path: str) -> str:
 		try:
+			self.device = torch.device(f"cpu")
 			self.set_pipeline("vit")
 			self.model.to(self.device)
 
