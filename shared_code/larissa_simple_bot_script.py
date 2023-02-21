@@ -3,17 +3,13 @@ import json
 import logging
 import random
 import threading
-from typing import Any
+
 
 import praw
 import sys
 import time
 import torch
-from azure.core.paging import ItemPaged
-from azure.data.tables import TableClient
-from azure.data.tables import TableServiceClient
-from azure.storage.blob import BlobServiceClient
-from azure.storage.queue import QueueMessage, QueueServiceClient, TextBase64EncodePolicy, QueueProperties
+from azure.storage.queue import QueueMessage
 from diffusers import StableDiffusionPipeline
 from praw import Reddit
 from praw.reddit import Submission
@@ -21,6 +17,14 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 
 logging.getLogger("diffusers").setLevel(logging.WARNING)
 logging.getLogger("azure.storage").setLevel(logging.WARNING)
+
+from shared_code.utility.spark import set_environ
+
+set_environ.set_azure_env()
+
+from shared_code.utility.storage.blob import BlobAdapter
+from shared_code.utility.storage.queue import QueueAdapter
+from shared_code.utility.storage.table import TableAdapter
 
 
 class FuckingStatic:
@@ -53,68 +57,6 @@ class FuckingStatic:
 			torch.cuda.empty_cache()
 
 
-class BlobBroker(object):
-	logging.getLogger("azure.storage").setLevel(logging.WARNING)
-
-	def __init__(self, container_name, blob_name):
-		self.blob_service_client = BlobServiceClient.from_connection_string(
-			"DefaultEndpointsProtocol=https;AccountName=ajdevreddit;AccountKey=+9066TCgdeVignRdy50G4qjmNoUJuibl9ERiTGzdV4fwkvgdV3aSVqgLwldgZxj/UpKLkkfXg+3k+AStjFI33Q==;BlobEndpoint=https://ajdevreddit.blob.core.windows.net/;QueueEndpoint=https://ajdevreddit.queue.core.windows.net/;TableEndpoint=https://ajdevreddit.table.core.windows.net/;FileEndpoint=https://ajdevreddit.file.core.windows.net/;")
-		self.container_name = container_name
-		self.blob_name = blob_name
-
-	def download_blob(self):
-		return self.blob_service_client.get_blob_client(container=self.container_name,
-														blob=self.blob_name).download_blob()
-
-	def upload_blob(self, data):
-		return self.blob_service_client.get_blob_client(container=self.container_name, blob=self.blob_name).upload_blob(
-			data, overwrite=True)
-
-
-class TableBroker(object):
-	def __init__(self):
-		self.connection_string = "DefaultEndpointsProtocol=https;AccountName=ajdevreddit;AccountKey=+9066TCgdeVignRdy50G4qjmNoUJuibl9ERiTGzdV4fwkvgdV3aSVqgLwldgZxj/UpKLkkfXg+3k+AStjFI33Q==;BlobEndpoint=https://ajdevreddit.blob.core.windows.net/;QueueEndpoint=https://ajdevreddit.queue.core.windows.net/;TableEndpoint=https://ajdevreddit.table.core.windows.net/;FileEndpoint=https://ajdevreddit.file.core.windows.net/;"
-
-	def get_table_service_client(self) -> TableServiceClient:
-		service = TableServiceClient.from_connection_string(conn_str=self.connection_string)
-		return service
-
-	def get_table_client(self, table_name: str) -> TableClient:
-		service: TableServiceClient = self.get_table_service_client()
-		return service.get_table_client(table_name=table_name)
-
-	def write_to_table(self, table_name: str, entity: dict):
-		table_client: TableClient = self.get_table_client(table_name=table_name)
-		table_client.create_entity(entity=entity)
-		return
-
-
-class MessageBroker(object):
-	logging.getLogger("azure.storage").setLevel(logging.WARNING)
-
-	def __init__(self):
-		self.connection_string: str = "DefaultEndpointsProtocol=https;AccountName=ajdevreddit;AccountKey=+9066TCgdeVignRdy50G4qjmNoUJuibl9ERiTGzdV4fwkvgdV3aSVqgLwldgZxj/UpKLkkfXg+3k+AStjFI33Q==;BlobEndpoint=https://ajdevreddit.blob.core.windows.net/;QueueEndpoint=https://ajdevreddit.queue.core.windows.net/;TableEndpoint=https://ajdevreddit.table.core.windows.net/;FileEndpoint=https://ajdevreddit.file.core.windows.net/;"
-		self.service: QueueServiceClient = QueueServiceClient.from_connection_string(self.connection_string, encode_policy=TextBase64EncodePolicy())
-
-	def put_message(self, queue_name: str, content: Any, time_to_live=None) -> QueueMessage:
-		if time_to_live is None:
-			return self.service.get_queue_client(queue_name).send_message(content=content)
-		else:
-			return self.service.get_queue_client(queue_name).send_message(content=content, time_to_live=time_to_live)
-
-	def get_message(self, queue_name: str) -> QueueMessage:
-		return self.service.get_queue_client(queue_name).receive_message()
-
-	def delete_message(self, queue_name: str, q, pop_receipt=None):
-		return self.service.get_queue_client(queue_name).delete_message(q, pop_receipt)
-
-	def get_queues(self) -> ItemPaged[QueueProperties]:
-		return self.service.list_queues()
-
-	def delete_queue(self, queue_name: str):
-		return self.service.delete_queue(queue_name)
-
-
 class PipeLineHolder(object):
 	pipe_line_name: str
 	diffusion_pipeline_path: str
@@ -127,13 +69,12 @@ class PipeLineHolder(object):
 class WebManager(threading.Thread):
 	def __init__(self, holder: [PipeLineHolder, PipeLineHolder], proc_name: str):
 		super().__init__(name=proc_name, daemon=True)
-		self.message_broker_instance: MessageBroker = MessageBroker()
-		self.poll_for_message_worker_thread = threading.Thread(target=self.poll_for_reply_queue, args=(), daemon=True,
-															   name=proc_name)
+		self.message_broker_instance: QueueAdapter = QueueAdapter()
+		self.poll_for_message_worker_thread = threading.Thread(target=self.poll_for_reply_queue, args=(), daemon=True, name=proc_name)
 		self.holders: [PipeLineHolder, PipeLineHolder] = holder
 
 	def reply_to_thing(self, q: dict):
-		message_broker_instance = MessageBroker()
+		message_broker_instance = QueueAdapter()
 		print(f"Got reply: {q}")
 		data_dict = q
 		text = data_dict.get("Text")
@@ -161,7 +102,8 @@ class WebManager(threading.Thread):
 				local_path = f"D://images//{output_images}"
 				with open(local_path, "rb") as f:
 					image_data = f.read()
-					BlobBroker(container_name='images', blob_name=output_images).upload_blob(image_data)
+					blob_adapter: BlobAdapter = BlobAdapter("images")
+					blob_adapter.upload_blob(data= image_data, blob_name=output_images)
 					final_remote_path = f"https://ajdevreddit.blob.core.windows.net/images/{output_images}"
 					reply = final_remote_path
 					print(final_remote_path)
@@ -220,7 +162,7 @@ class SimpleBot(threading.Thread):
 		self.tokenizer = GPT2Tokenizer.from_pretrained(self.language_model_path)
 		self.model = GPT2LMHeadModel.from_pretrained(self.language_model_path)
 		self.holders: [PipeLineHolder, PipeLineHolder] = holder
-		self.table_broker: TableBroker = TableBroker()
+		self.table_broker: TableAdapter = TableAdapter()
 		self.poll_for_message_worker_thread = threading.Thread(target=self.main_process, args=(), daemon=True, name=proc_name)
 		self.things_to_say: [str] = []
 
@@ -284,8 +226,13 @@ class SimpleBot(threading.Thread):
 		local_path = f"D://images//{image_name}"
 		with open(local_path, "rb") as f:
 			image_data = f.read()
-			BlobBroker(container_name='images', blob_name=image_name).upload_blob(image_data)
+
+			blob_adapter = BlobAdapter("ajdevreddit")
+
+			blob_adapter.upload_blob(blob_name=image_name, data=image_data)
+
 			final_remote_path = f"https://ajdevreddit.blob.core.windows.net/images/{image_name}"
+
 			return final_remote_path
 
 	def write_output_to_table_storage_row(self, final_remote_path, prompt):
@@ -303,8 +250,8 @@ class SimpleBot(threading.Thread):
 			"IsThinking": False,
 			"Channel": "General"
 		}
-
-		TableBroker().write_to_table(table_name="messages", entity=entity)
+		table_adapter: TableAdapter = TableAdapter()
+		table_adapter.upsert_entity_to_table("messages", entity)
 
 	def main_process(self):
 		counter = 1
@@ -317,8 +264,8 @@ class SimpleBot(threading.Thread):
 			image_prompt: str = self.create_prompt()
 			print("Prompt: " + image_prompt)
 			(image_output, guidance, num_steps) = FuckingStatic.create_image(image_prompt, pipe, "1")
-			remote_path: str = self.write_image_to_cloud(image_output)
-			bot.write_output_to_table_storage_row(remote_path, image_prompt)
+			# remote_path: str = self.write_image_to_cloud(image_output)
+			# bot.write_output_to_table_storage_row(remote_path, image_prompt)
 
 			try:
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
