@@ -227,7 +227,7 @@ class SimpleBot(threading.Thread):
 		with open(local_path, "rb") as f:
 			image_data = f.read()
 
-			blob_adapter = BlobAdapter("ajdevreddit")
+			blob_adapter = BlobAdapter("images")
 
 			blob_adapter.upload_blob(blob_name=image_name, data=image_data)
 
