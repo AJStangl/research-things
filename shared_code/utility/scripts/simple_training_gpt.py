@@ -8,9 +8,6 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 from transformers import TrainingArguments, Trainer
 from transformers.pipelines.base import Dataset
 
-from scripts.utility import azure_table_adaper
-from scripts.utility.azure_table_adaper import TableBroker
-
 os.environ["WANDB_DISABLED"] = "true"
 logging.basicConfig(level=logging.INFO)
 
@@ -34,19 +31,7 @@ class CustomDataset(Dataset):
 	def __getitem__(self, index):
 		return self.input_ids[index], self.attention_mask[index]
 
-
-def create_training_file_for_gpt_model():
-	broker: TableBroker = azure_table_adaper.TableBroker()
-	all_training_data = broker.get_all_entities("training")
-	with open("training.txt", "wb") as f:
-		for text_line in all_training_data:
-			text = text_line.get("text")
-			line = "<|startoftext|>" + f"{text}" + "<|endoftext|>" + "\n"
-			f.write(line.encode("utf-8"))
-
-
 def train_gpt_model():
-
 	model_type = ""
 	model_name = f"sexy-prompt-bot{model_type}"
 
@@ -57,7 +42,7 @@ def train_gpt_model():
 	tokenizer_path = f"{model_output_dir}"
 
 	data_lines = []
-	with open('training.txt', 'r', encoding="UTF-8") as f:
+	with open('D:\\workspaces\\General\\notebooks\\nb_use_cases\\training.txt', 'r', encoding="UTF-8") as f:
 		lines = f.readlines()
 		for line in lines:
 			data_lines.append(line)
@@ -134,9 +119,9 @@ def train_gpt_model():
 		train_dataset=train_dataset,
 		eval_dataset=eval_dataset,
 		data_collator=lambda data: {
-			'input_ids': torch.stack([f[0] for f in data]),
-			'attention_mask': torch.stack([f[1] for f in data]),
-			'labels': torch.stack([f[0] for f in data])
+			'input_ids': torch.stack([x[0] for x in data]),
+			'attention_mask': torch.stack([x[1] for x in data]),
+			'labels': torch.stack([x[0] for x in data])
 		}
 	)
 
@@ -188,6 +173,7 @@ def talk_to_gpt_model():
 	for elem in result_distinct:
 		print(elem)
 
+
 if __name__ == '__main__':
-	# create_training_file_for_gpt_model()
-	talk_to_gpt_model()
+	train_gpt_model()
+	# talk_to_gpt_model()

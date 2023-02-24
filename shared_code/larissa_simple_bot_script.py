@@ -60,18 +60,20 @@ class FuckingStatic:
 class PipeLineHolder(object):
 	pipe_line_name: str
 	diffusion_pipeline_path: str
+	text_model_path: str
 
-	def __init__(self, pipe_line_name: str, diffusion_pipeline_path: str):
+	def __init__(self, pipe_line_name: str, diffusion_pipeline_path: str, text_model_path: str):
 		self.pipe_line_name: str = pipe_line_name
 		self.diffusion_pipeline_path: str = diffusion_pipeline_path
+		self.text_model_path: str = text_model_path
 
 
 class WebManager(threading.Thread):
-	def __init__(self, holder: [PipeLineHolder, PipeLineHolder], proc_name: str):
+	def __init__(self, holder: [PipeLineHolder], proc_name: str):
 		super().__init__(name=proc_name, daemon=True)
 		self.message_broker_instance: QueueAdapter = QueueAdapter()
 		self.poll_for_message_worker_thread = threading.Thread(target=self.poll_for_reply_queue, args=(), daemon=True, name=proc_name)
-		self.holders: [PipeLineHolder, PipeLineHolder] = holder
+		self.holders: [PipeLineHolder] = holder
 
 	def reply_to_thing(self, q: dict):
 		message_broker_instance = QueueAdapter()
@@ -141,7 +143,7 @@ class WebManager(threading.Thread):
 					q = json.loads(message.content)
 					self.reply_to_thing(q)
 					self.message_broker_instance.delete_message("chat-input", message)
-					time.sleep(1)
+					time.sleep(30)
 			except Exception as e:
 				print(f":: Error polling for reply queue: {e}")
 				pass
@@ -156,36 +158,28 @@ class WebManager(threading.Thread):
 
 
 class SimpleBot(threading.Thread):
-	def __init__(self, holder: [PipeLineHolder, PipeLineHolder], proc_name: str):
+	def __init__(self, holder: [PipeLineHolder], proc_name: str):
 		super().__init__(name=proc_name, daemon=True)
-		self.language_model_path = "D:\\models\\sexy-prompt-bot"
-		self.tokenizer = GPT2Tokenizer.from_pretrained(self.language_model_path)
-		self.model = GPT2LMHeadModel.from_pretrained(self.language_model_path)
-		self.holders: [PipeLineHolder, PipeLineHolder] = holder
+		self.holders: [] = holder
 		self.table_broker: TableAdapter = TableAdapter()
 		self.poll_for_message_worker_thread = threading.Thread(target=self.main_process, args=(), daemon=True, name=proc_name)
 		self.things_to_say: [str] = []
+		self.counter = 0
 
-	def create_prompt(self):
-		if len(self.things_to_say) > 0:
-			random.shuffle(self.things_to_say)
-			return self.things_to_say.pop()
+	def get_gpt_model(self, model_to_use: PipeLineHolder) -> (GPT2Tokenizer, GPT2LMHeadModel):
+		tokenizer = GPT2Tokenizer.from_pretrained(model_to_use.text_model_path)
+		model = GPT2LMHeadModel.from_pretrained(model_to_use.text_model_path)
+		return tokenizer, model
+
+	def create_prompt(self, pipe_line_holder: PipeLineHolder):
 		try:
-			model_name = f"sexy-prompt-bot"
-
-			parent_directory = "/models/"
-
-			model_output_dir = f"{parent_directory}/{model_name}"
+			tokenizer, model = self.get_gpt_model(pipe_line_holder)
 
 			question = "<|startoftext|>"
 
 			prompt = f"{question}"
 
 			device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
-
-			tokenizer = GPT2Tokenizer.from_pretrained(model_output_dir)
-
-			model = GPT2LMHeadModel.from_pretrained(model_output_dir)
 
 			generation_prompt = tokenizer(prompt, add_special_tokens=False, return_tensors="pt")
 
@@ -201,26 +195,23 @@ class SimpleBot(threading.Thread):
 											attention_mask=attention_mask,
 											do_sample=True,
 											max_length=50,
-											num_return_sequences=2,
+											num_return_sequences=1,
 											repetition_penalty=1.1)
-
+			out = None
 			for i, sample_output in enumerate(sample_outputs):
 				result = tokenizer.decode(sample_output, skip_special_tokens=True)
-				if result in self.things_to_say:
-					continue
-				else:
-					self.things_to_say.append(result)
+				out = result
+				break
 
 			model.to("cpu")
 			generation_prompt.to("cpu")
 			torch.cuda.empty_cache()
 
-			random.shuffle(self.things_to_say)
-			return self.things_to_say.pop()
+			return out
 
 		except Exception as e:
 			print(e)
-			return self.create_prompt()
+			return self.create_prompt(pipe_line_holder)
 
 	def write_image_to_cloud(self, image_name):
 		local_path = f"D://images//{image_name}"
@@ -254,18 +245,18 @@ class SimpleBot(threading.Thread):
 		table_adapter.upsert_entity_to_table("messages", entity)
 
 	def main_process(self):
-		counter = 1
 		while True:
-			model_index = counter % 2
+			model_index = self.counter % 3
+			print(f":: Using model: {model_index}")
+			print(len(self.holders))
 			holder: PipeLineHolder = self.holders[model_index]
-			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16",
-														   torch_dtype=torch.float16, safety_checker=None)
+			print(f":: Using model: {holder.text_model_path}")
 
-			image_prompt: str = self.create_prompt()
+			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16", torch_dtype=torch.float16, safety_checker=None)
+
+			image_prompt: str = self.create_prompt(holder)
 			print("Prompt: " + image_prompt)
 			(image_output, guidance, num_steps) = FuckingStatic.create_image(image_prompt, pipe, "1")
-			# remote_path: str = self.write_image_to_cloud(image_output)
-			# bot.write_output_to_table_storage_row(remote_path, image_prompt)
 
 			try:
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
@@ -280,13 +271,19 @@ class SimpleBot(threading.Thread):
 |:---------------|:-----------------------:|------------|--------------------------:|
 | {image_prompt} | {holder.pipe_line_name} | {guidance} |               {num_steps} |
 				"""
-				print(body)
+
 				submission.reply(body)
+				self.counter += 1
+
+				final_remote_path = self.write_image_to_cloud(image_output)
+				self.write_output_to_table_storage_row(final_remote_path, image_prompt)
+
 
 			except Exception as e:
 				print(e)
+				self.counter += 1
 				continue
-			time.sleep(5)
+
 
 	def run(self):
 		self.poll_for_message_worker_thread.start()
@@ -296,17 +293,24 @@ class SimpleBot(threading.Thread):
 
 
 if __name__ == '__main__':
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2")
 
-	pipeline_2 = PipeLineHolder("SexyDiffusion2", "D:\\models\\SexyDiffusion2")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2", "D:\\models\\sexy-prompt-bot")
 
-	pipe_line_holder_list: [PipeLineHolder, PipeLineHolder] = [pipeline_1, pipeline_2]
+	pipeline_2 = PipeLineHolder("SexyDiffusion2", "D:\\models\\SexyDiffusion2", "D:\\models\\sexy-prompt-bot")
 
-	proc = WebManager(pipe_line_holder_list, f"ProcessManager-1")
-	proc.start()
+	pipeline_3 = PipeLineHolder("BigPictureDiffusion", "D:\\models\\BigPictureDiffusion", "D:\\models\\BigPictureDiffusion\\nature-prompt-bot")
 
-	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot-v2")
+	pipe_line_holder_list = []
+
+	pipe_line_holder_list.append(pipeline_3)
+	pipe_line_holder_list.append(pipeline_1)
+	pipe_line_holder_list.append(pipeline_2)
+
+	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot")
 	bot.start()
+
+	proc: WebManager = WebManager(proc_name="holder", holder=pipe_line_holder_list)
+	proc.start()
 
 	while True:
 		try:
