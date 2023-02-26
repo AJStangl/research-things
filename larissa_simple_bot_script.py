@@ -14,10 +14,6 @@ from diffusers import StableDiffusionPipeline
 from praw import Reddit
 from praw.reddit import Submission
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
-
-logging.getLogger("diffusers").setLevel(logging.WARNING)
-logging.getLogger("azure.storage").setLevel(logging.WARNING)
-
 from shared_code.utility.spark import set_environ
 
 set_environ.set_azure_env()
@@ -25,6 +21,10 @@ set_environ.set_azure_env()
 from shared_code.utility.storage.blob import BlobAdapter
 from shared_code.utility.storage.queue import QueueAdapter
 from shared_code.utility.storage.table import TableAdapter
+
+logging.getLogger("diffusers").setLevel(logging.WARNING)
+logging.getLogger("azure.storage").setLevel(logging.WARNING)
+
 
 class FuckingStatic:
 	@staticmethod
