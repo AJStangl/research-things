@@ -26,8 +26,30 @@ from shared_code.utility.storage.blob import BlobAdapter
 from shared_code.utility.storage.queue import QueueAdapter
 from shared_code.utility.storage.table import TableAdapter
 
-
 class FuckingStatic:
+	@staticmethod
+	def validate_message(message):
+		import re
+		start_end_regex = re.compile("<\|startoftext\|>(.+?)<\|endoftext\|>")
+		prompt_regex = re.compile("<\|prompt\|>(.+?)<\|text\|>")
+		text_regex = re.compile("<\|text\|>(.+?)<\|endoftext\|>")
+		found_start_end = start_end_regex.findall(message)
+		if len(found_start_end) == 0:
+			return "", ""
+
+		generated_prompt = ""
+		generated_text = ""
+
+		found_prompt = prompt_regex.findall(message)
+		if len(found_prompt) > 0:
+			generated_prompt = found_prompt[0]
+
+		found_text = text_regex.findall(message)
+		if len(found_text) > 0:
+			generated_text = found_text[0]
+
+		return generated_prompt.strip(), generated_text.strip()
+
 	@staticmethod
 	def create_image(prompt: str, pipe: StableDiffusionPipeline, device_name: str) -> (str, int, int):
 		try:
@@ -175,7 +197,7 @@ class SimpleBot(threading.Thread):
 		try:
 			tokenizer, model = self.get_gpt_model(pipe_line_holder)
 
-			question = "<|startoftext|>"
+			question = f"<|startoftext|> <|model|> {pipe_line_holder.pipe_line_name} <|prompt|>"
 
 			prompt = f"{question}"
 
@@ -197,17 +219,20 @@ class SimpleBot(threading.Thread):
 											max_length=50,
 											num_return_sequences=1,
 											repetition_penalty=1.1)
-			out = None
+
+			prompt_for_reddit = ""
+			prompt_for_image_generation = ""
 			for i, sample_output in enumerate(sample_outputs):
-				result = tokenizer.decode(sample_output, skip_special_tokens=True)
-				out = result
-				break
+				result = tokenizer.decode(sample_output, skip_special_tokens=False)
+				prompt, text = FuckingStatic.validate_message(result)
+				prompt_for_reddit = prompt
+				prompt_for_image_generation = text
 
 			model.to("cpu")
 			generation_prompt.to("cpu")
 			torch.cuda.empty_cache()
 
-			return out
+			return prompt_for_reddit, prompt_for_image_generation
 
 		except Exception as e:
 			print(e)
@@ -254,7 +279,8 @@ class SimpleBot(threading.Thread):
 
 			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16", torch_dtype=torch.float16, safety_checker=None)
 
-			image_prompt: str = self.create_prompt(holder)
+			reddit_text, image_prompt = self.create_prompt(holder)
+			print("Reddit Text: " + reddit_text)
 			print("Prompt: " + image_prompt)
 			(image_output, guidance, num_steps) = FuckingStatic.create_image(image_prompt, pipe, "1")
 
@@ -262,7 +288,7 @@ class SimpleBot(threading.Thread):
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
 				sub = instance.subreddit("CoopAndPabloArtHouse")
 				submission: Submission = sub.submit_image(
-					title=f"{image_prompt}",
+					title=f"{reddit_text}",
 					image_path=f"D://images//{image_output}", nsfw=True)
 
 				submission.mod.approve()
@@ -294,17 +320,13 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2", "D:\\models\\sexy-prompt-bot")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2", "D:\\models\\sd-prompt-bot")
 
-	pipeline_2 = PipeLineHolder("SexyDiffusion2", "D:\\models\\SexyDiffusion2", "D:\\models\\sexy-prompt-bot")
+	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureScapes", "D:\\models\\sd-prompt-bot")
 
-	pipeline_3 = PipeLineHolder("BigPictureDiffusion", "D:\\models\\BigPictureDiffusion", "D:\\models\\BigPictureDiffusion\\nature-prompt-bot")
+	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot")
 
-	pipe_line_holder_list = []
-
-	pipe_line_holder_list.append(pipeline_3)
-	pipe_line_holder_list.append(pipeline_1)
-	pipe_line_holder_list.append(pipeline_2)
+	pipe_line_holder_list = [pipeline_3, pipeline_1, pipeline_2]
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot")
 	bot.start()
