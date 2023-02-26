@@ -327,6 +327,7 @@ if __name__ == '__main__':
 	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot")
 
 	pipe_line_holder_list = [pipeline_3, pipeline_1, pipeline_2]
+	random.shuffle(pipe_line_holder_list)
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot")
 	bot.start()
