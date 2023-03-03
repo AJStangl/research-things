@@ -29,26 +29,30 @@ logging.getLogger("azure.storage").setLevel(logging.WARNING)
 class FuckingStatic:
 	@staticmethod
 	def validate_message(message):
-		import re
-		start_end_regex = re.compile("<\|startoftext\|>(.+?)<\|endoftext\|>")
-		prompt_regex = re.compile("<\|prompt\|>(.+?)<\|text\|>")
-		text_regex = re.compile("<\|text\|>(.+?)<\|endoftext\|>")
-		found_start_end = start_end_regex.findall(message)
-		if len(found_start_end) == 0:
+		try:
+			import re
+			start_end_regex = re.compile("<\|startoftext\|>(.+?)<\|endoftext\|>")
+			prompt_regex = re.compile("<\|prompt\|>(.+?)<\|text\|>")
+			text_regex = re.compile("<\|text\|>(.+?)<\|endoftext\|>")
+			found_start_end = start_end_regex.findall(message)
+			if len(found_start_end) == 0:
+				return "", ""
+
+			generated_prompt = ""
+			generated_text = ""
+
+			found_prompt = prompt_regex.findall(message)
+			if len(found_prompt) > 0:
+				generated_prompt = found_prompt[0]
+
+			found_text = text_regex.findall(message)
+			if len(found_text) > 0:
+				generated_text = found_text[0]
+
+			return generated_prompt.strip(), generated_text.strip()
+		except Exception as e:
+			print(e)
 			return "", ""
-
-		generated_prompt = ""
-		generated_text = ""
-
-		found_prompt = prompt_regex.findall(message)
-		if len(found_prompt) > 0:
-			generated_prompt = found_prompt[0]
-
-		found_text = text_regex.findall(message)
-		if len(found_text) > 0:
-			generated_text = found_text[0]
-
-		return generated_prompt.strip(), generated_text.strip()
 
 	@staticmethod
 	def create_image(prompt: str, pipe: StableDiffusionPipeline, device_name: str) -> (str, int, int):
@@ -282,7 +286,12 @@ class SimpleBot(threading.Thread):
 			reddit_text, image_prompt = self.create_prompt(holder)
 			print("Reddit Text: " + reddit_text)
 			print("Prompt: " + image_prompt)
-			(image_output, guidance, num_steps) = FuckingStatic.create_image(image_prompt, pipe, "1")
+			gen = f"{reddit_text} : ({image_prompt})"
+			try:
+				(image_output, guidance, num_steps) = FuckingStatic.create_image(reddit_text + "|" + image_prompt, pipe, "1")
+			except Exception as e:
+				print(e)
+				continue
 
 			try:
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
@@ -295,7 +304,7 @@ class SimpleBot(threading.Thread):
 				body = f"""
 | Prompt         |       Model Name        | Guidance   | Number Of Inference Steps |
 |:---------------|:-----------------------:|------------|--------------------------:|
-| {image_prompt} | {holder.pipe_line_name} | {guidance} |               {num_steps} |
+| {gen}          | {holder.pipe_line_name} | {guidance} |               {num_steps} |
 				"""
 
 				submission.reply(body)
@@ -320,14 +329,13 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-V2", "D:\\models\\sd-prompt-bot")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-2", "D:\\models\\sd-prompt-bot")
 
 	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureScapes", "D:\\models\\sd-prompt-bot")
 
 	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot")
 
-	pipe_line_holder_list = [pipeline_3, pipeline_1, pipeline_2]
-	random.shuffle(pipe_line_holder_list)
+	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3]
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot")
 	bot.start()
