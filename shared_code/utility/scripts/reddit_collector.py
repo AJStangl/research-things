@@ -7,6 +7,7 @@ import PIL.Image
 import pandas
 import requests
 
+from shared_code.utility.scripts.blip_caption import BlipCaption
 from shared_code.utility.storage.table import TableAdapter
 from shared_code.utility.storage.table_entry import TableEntry
 
@@ -22,6 +23,7 @@ class RedditDataCollector(object):
 		self.image_count: int = 0
 		self.hashes: [] = []
 		self.ids: [] = []
+		self.blip = BlipCaption(1)
 
 	def loop_between_dates(self, start_datetime, end_datetime):
 		time_interval = datetime.timedelta(weeks=1)
@@ -61,8 +63,7 @@ class RedditDataCollector(object):
 						   curated=False)
 		return entry
 
-	def download_subreddit_images(self, subreddit, start_date="2023-01-01",
-								  end_date=datetime.datetime.today().strftime('%Y-%m-%d')):
+	def download_subreddit_images(self, subreddit, start_date="2023-01-01", end_date=datetime.datetime.today().strftime('%Y-%m-%d')):
 
 		table_client = self.table_adapter.get_table_client(self.table_name)
 
@@ -106,8 +107,8 @@ class RedditDataCollector(object):
 		print(f"All images from {subreddit} subreddit are downloaded")
 		return self.image_count
 
-	def handle_submission(self, submission, data,
-						  final_path):  # note this is buggy if data is not present as a input to the method
+	# note this is buggy if data is not present as a input to the method
+	def handle_submission(self, submission, data, final_path):
 		try:
 			if 'selftext' not in submission:
 				# ignore submissions with no selftext key (buggy)
@@ -144,12 +145,13 @@ class RedditDataCollector(object):
 					else:
 						self.hashes.append(md5)
 					table_client = self.table_adapter.get_table_client(self.table_name)
+
 					out_image = f"{final_path}/{image_name}"
+
 					try:
 						with open(out_image, "wb") as f:
 							f.write(content)
-
-							caption = None
+							caption = self.blip.caption_image(out_image)
 							updated_caption = None
 							small_image = self.get_resized_image(final_path, image_name)
 							entity = TableEntry(
@@ -172,7 +174,6 @@ class RedditDataCollector(object):
 								curated=False)
 
 							to_add = entity.__dict__
-							# logging.info(to_add)
 							table_client.upsert_entity(entity=to_add)
 							self.image_count += 1
 							print("File downloaded\t" + image_name + "\t" + "count\t" + str(self.image_count))
@@ -186,74 +187,6 @@ class RedditDataCollector(object):
 		except Exception as e:
 			logging.error(e)
 			return
-
-	def write_json_meta_data(self):
-		"""
-			# {"file_name": "0001.png", "text": "This is a golden retriever playing with a ball"}
-			# {"file_name": "0002.png", "text": "A german shepherd"}
-			# {"file_name": "0003.png", "text": "One chihuahua"}
-		"""
-		# Filter and unsure the other process found the captions
-		table_client = self.table_adapter.get_table_client(self.table_name)
-		all_current_images: list[dict] = list(table_client.list_entities("training"))
-
-		logging.info(f"Total Raw Images: {len(all_current_images)}")
-
-		present_images = []
-		for image in all_current_images:
-			"""
-			{
-			  "PartitionKey": "training",
-			  "RowKey": "1000d16",
-			  "image": "D:\\workspaces\\General\\scripts\\images\\GgFEagO.jpg",
-			  "text": "Thoughts about my NYE party outfit?",
-			  "id": "1000d16",
-			  "author": "princessxo699",
-			  "url": "https://i.imgur.com/GgFEagO.jpg",
-			  "flair": "Outfit of the Day",
-			  "permalink": "/r/SFWNextDoorGirls/comments/1000d16/thoughts_about_my_nye_party_outfit/",
-			  "hash": "9951b4f82caeb8ba2bd9f79f8d422450"
-			}
-			"""
-
-			if not os.path.exists(image.get('image')):
-				logging.info(f"File does not exist, skipping: {image.get('image')}")
-			else:
-				present_images.append(image)
-
-		logging.info(f"Filtered Images: {len(present_images)}")
-
-		data_frame = pandas.DataFrame(present_images,
-									  columns=['image', 'text', 'id', 'author', 'url', 'flair', 'permalink', 'hash',
-											   'caption', 'updated_caption', 'exists', 'small_image', 'image_name', 'curated'])
-
-		# extract the file name from the image path
-		file_name = data_frame['image'].map(lambda x: os.path.split(x)[-1])
-
-		# extract the text from the data frame
-		text = data_frame['text']
-
-		caption = data_frame['caption']
-
-		# create a new data frame with the file name and text
-		filtered_frame = pandas.DataFrame({'file_name': file_name.values, 'text': text.values})
-
-		alternate_frame = pandas.DataFrame({'file_name': file_name.values, 'text': caption.values})
-
-		all_frames = pandas.concat([filtered_frame, alternate_frame])
-
-		# write the data frame to a json lines file
-		filtered_frame_json_lines = filtered_frame.to_json(orient='records', lines=True)
-		alternate_frame_json_lines = alternate_frame.to_json(orient='records', lines=True)
-
-		# write the json lines to a file
-		with open('metadata.jsonl', 'w', encoding='utf-8') as f:
-			f.write(filtered_frame_json_lines)
-
-			f.write(alternate_frame_json_lines)
-
-		return all_frames
-
 
 	def resize_image(self, path: str):
 		img = PIL.Image.open(path)
