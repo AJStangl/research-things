@@ -2,27 +2,23 @@ import hashlib
 import json
 import logging
 import random
+import subprocess
 import threading
 
-import random
 import praw
 import sys
 import time
 import torch
-from azure.storage.queue import QueueMessage
-from diffusers import StableDiffusionPipeline, StableDiffusionLatentUpscalePipeline
-from transformers import pipeline
+from diffusers import StableDiffusionPipeline
 from praw import Reddit
 from praw.reddit import Submission
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
+
 from shared_code.utility.spark import set_environ
-import os
-import subprocess
 
 set_environ.set_azure_env()
 
 from shared_code.utility.storage.blob import BlobAdapter
-from shared_code.utility.storage.queue import QueueAdapter
 from shared_code.utility.storage.table import TableAdapter
 
 logging.getLogger("diffusers").setLevel(logging.WARNING)
@@ -289,16 +285,13 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-15500", "D:\\models\\sd-prompt-bot-2")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-2")
 
-	pipeline_2 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-15500", "D:\\models\\sd-prompt-bot-2")
+	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-2")
 
-	pipeline_3 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-15500", "D:\\models\\sd-prompt-bot-2")
+	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-2")
 
-	pipeline_4 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-15500", "D:\\models\\sd-prompt-bot-2")
-
-	# pipeline_5 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-2")
-	pipeline_5 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-15500", "D:\\models\\sd-prompt-bot-2")
+	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-2")
 
 	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4]
 
@@ -306,11 +299,11 @@ if __name__ == '__main__':
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", 1)
 	bot.start()
-
-	time.sleep(60 * 7)
-	random.shuffle(pipe_line_holder_list)
-	bot_2: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", 0)
-	bot_2.start()
+	#
+	# time.sleep(60 * 7)
+	# random.shuffle(pipe_line_holder_list)
+	# bot_2: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", 0)
+	# bot_2.start()
 
 	while True:
 		try:

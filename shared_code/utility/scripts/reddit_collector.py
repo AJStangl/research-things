@@ -10,6 +10,10 @@ import requests
 from shared_code.utility.scripts.blip_caption import BlipCaption
 from shared_code.utility.storage.table import TableAdapter
 from shared_code.utility.storage.table_entry import TableEntry
+import logging
+import time
+
+from shared_code.utility.spark.set_environ import set_azure_env
 
 logging.getLogger("diffusers").setLevel(logging.WARNING)
 logging.getLogger("azure.storage").setLevel(logging.WARNING)
@@ -63,7 +67,7 @@ class RedditDataCollector(object):
 						   curated=False)
 		return entry
 
-	def download_subreddit_images(self, subreddit, start_date="2023-01-01", end_date=datetime.datetime.today().strftime('%Y-%m-%d')):
+	def download_subreddit_images(self, subreddit, start_date="2022-11-03", end_date=datetime.datetime.today().strftime('%Y-%m-%d')):
 
 		table_client = self.table_adapter.get_table_client(self.table_name)
 
@@ -81,20 +85,20 @@ class RedditDataCollector(object):
 
 		print(f"== Starting {subreddit} ==")
 		for start, end in self.loop_between_dates(start_date, end_date):
-			submission_search_link = ('https://api.pushshift.io/reddit/submission/search/'
-									  '?subreddit={}&after={}&before={}&stickied=0&limit={}&mod_removed=0')
-			submission_search_link = submission_search_link.format(subreddit, int(start.timestamp()),
-																   int(end.timestamp()), 100)
-			submission_response = requests.get(submission_search_link)
+			submission_search_link = ('https://api.pushshift.io/reddit/submission/search/?subreddit={}&after={}&before={}&stickied=0&limit={}&mod_removed=0')
+			search_link = f"https://api.pushshift.io/reddit/submission/search/?subreddit={subreddit}&after={int(start_date.timestamp())}&stickied=0&limit=100&mod_removed=0"
+			# submission_search_link = submission_search_link.format(subreddit, int(start.timestamp()), int(end.timestamp()), 100)
+			submission_response = requests.get(search_link)
 			try:
 				data = submission_response.json()
-			except requests.exceptions.JSONDecodeError:
-				print("Error decoding JSON")
+			except requests.exceptions.JSONDecodeError as r:
+				print(f"Error decoding JSON {r}")
 				continue
 
 			submissions = data.get('data')
 
 			if submissions is None:
+				print(f"No submissions found for {subreddit} between {start} and {end}")
 				continue
 			try:
 				os.mkdir(final_path)
@@ -110,15 +114,19 @@ class RedditDataCollector(object):
 	# note this is buggy if data is not present as a input to the method
 	def handle_submission(self, submission, data, final_path):
 		try:
+			print(f"Handling submission {submission['id']}")
 			if 'selftext' not in submission:
+				print(f"Submission {submission['id']} has no selftext")
 				# ignore submissions with no selftext key (buggy)
 				return
 
 			if submission['selftext'] in ['[removed]', '[deleted]']:
+				print(f"Submission {submission['id']} has been removed or deleted")
 				# ignore submissions that have no content
 				return
 
 			if submission.get('id') in self.ids:
+				print(f"Submission {submission['id']} already exists")
 				return
 
 			if "url" in submission:
@@ -141,14 +149,17 @@ class RedditDataCollector(object):
 					content = response.content
 					md5 = hashlib.md5(content).hexdigest()
 					if md5 == "f17b01901c752c1bb04928131d1661af" or md5 == "d835884373f4d6c8f24742ceabe74946" or md5 in self.hashes:
+						print(f"Skipping {image_name} because it is a duplicate")
 						return
 					else:
 						self.hashes.append(md5)
+
 					table_client = self.table_adapter.get_table_client(self.table_name)
 
 					out_image = f"{final_path}/{image_name}"
 
 					try:
+						print(f"Writing image {out_image}")
 						with open(out_image, "wb") as f:
 							f.write(content)
 							caption = self.blip.caption_image(out_image)
@@ -179,13 +190,13 @@ class RedditDataCollector(object):
 							print("File downloaded\t" + image_name + "\t" + "count\t" + str(self.image_count))
 							return
 					except Exception as e:
-						logging.error(e)
+						print(e)
 						return
 			else:
 				return
 
 		except Exception as e:
-			logging.error(e)
+			print(e)
 			return
 
 	def resize_image(self, path: str):
