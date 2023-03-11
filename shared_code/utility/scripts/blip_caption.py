@@ -43,8 +43,8 @@ class BlipCaption:
 			inputs = self.processor(raw_image, return_tensors="pt").to(self.device, torch.float16)
 
 			out = self.model.generate(**inputs)
-			return self.processor.decode(out[0], skip_special_tokens=True, max_length=50)
+			return self.processor.decode(out[0], skip_special_tokens=True, max_new_tokens=50)
 
 		except Exception as e:
 			print(e)
-			return "bruh"
+			return ""
