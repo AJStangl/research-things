@@ -25,7 +25,9 @@ logging.getLogger("diffusers").setLevel(logging.WARNING)
 logging.getLogger("azure.storage").setLevel(logging.WARNING)
 
 import os
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+
 
 class FuckingStatic:
 	@staticmethod
@@ -93,7 +95,8 @@ class FuckingStatic:
 			}
 			print(json.dumps(args, indent=4))
 
-			initial_image = pipe(prompt, height=512, width=512, guidance_scale=guidance_scale, num_inference_steps=num_inference_steps).images[0]
+			initial_image = pipe(prompt, height=512, width=512, guidance_scale=guidance_scale,
+								 num_inference_steps=num_inference_steps).images[0]
 
 			hash_name = f"{hashlib.md5(prompt.encode()).hexdigest()}"
 
@@ -131,7 +134,8 @@ class SimpleBot(threading.Thread):
 		super().__init__(name=proc_name, daemon=True)
 		self.holders: [] = holder
 		self.table_broker: TableAdapter = TableAdapter()
-		self.poll_for_message_worker_thread = threading.Thread(target=self.main_process, args=(), daemon=True, name=proc_name)
+		self.poll_for_message_worker_thread = threading.Thread(target=self.main_process, args=(), daemon=True,
+															   name=proc_name)
 		self.things_to_say: [str] = []
 		self.counter = 0
 		self.instance = instance
@@ -229,8 +233,8 @@ class SimpleBot(threading.Thread):
 			print(f":: Using model: {holder.diffusion_pipeline_path}")
 			print(f":: Using Device: {self.instance}")
 
-
-			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16", torch_dtype=torch.float16, safety_checker=None)
+			pipe = StableDiffusionPipeline.from_pretrained(holder.diffusion_pipeline_path, revision="fp16",
+														   torch_dtype=torch.float16, safety_checker=None)
 			print(":: Model Loaded")
 
 			reddit_text, image_prompt = self.create_prompt(holder)
@@ -252,11 +256,31 @@ class SimpleBot(threading.Thread):
 			try:
 				instance: Reddit = praw.Reddit(site_name="KimmieBotGPT")
 				sub = instance.subreddit("CoopAndPabloArtHouse")
+
+				flair_map: dict = {
+					"CosmicDiffusion": "80192e8a-c116-11ed-9afc-061002270b1c",
+					"SexyDiffusion": "6c02c0aa-c116-11ed-a36b-625bab71eac2",
+					"MemeDiffusion": "52782e72-c116-11ed-8d42-9226dee3c916",
+					"CityDiffusion": "3f3db71e-c116-11ed-bc88-4257f93035d0",
+					"NatureDiffusion": "49b00d00-c116-11ed-80c5-7ef7afdcdf7d"
+				}
+
+				if holder.pipe_line_name == "MemeDiffusion":
+					if self.counter % 2 == 0:
+						fuck = instance.subreddit("dankmemes")
+						fuck.submit_image(title=f"{reddit_text}", image_path=image_output, nsfw=False)
+						pass
+				else:
+					pass
+
 				submission: Submission = sub.submit_image(
 					title=f"{reddit_text}",
-					image_path=image_output, nsfw=True)
+					image_path=image_output,
+					nsfw=False,
+					flair_id=flair_map.get(holder.pipe_line_name))
 
 				submission.mod.approve()
+
 				body = f"""
 | Prompt         |       Model Name        | Guidance   | Number Of Inference Steps |
 |:---------------|:-----------------------:|------------|--------------------------:|
@@ -265,6 +289,13 @@ class SimpleBot(threading.Thread):
 
 				submission.reply(body)
 				self.counter += 1
+
+				if self.counter % 100 == 0:
+					sub = instance.subreddit("CoopAndPabloPlayHouse")
+					submission: Submission = sub.submit_image(
+						title=f"{reddit_text}",
+						image_path=image_output, nsfw=False)
+					submission.save()
 
 				final_remote_path = self.write_image_to_cloud(image_output)
 				self.write_output_to_table_storage_row(final_remote_path, image_prompt)
@@ -275,7 +306,6 @@ class SimpleBot(threading.Thread):
 				self.counter += 1
 				continue
 
-
 	def run(self):
 		self.poll_for_message_worker_thread.start()
 
@@ -285,121 +315,25 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-2")
 
-	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-2")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-3")
 
-	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-2")
+	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-3")
 
-	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-2")
+	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-3")
 
-	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4]
+	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-3")
 
-	random.shuffle(pipe_line_holder_list)
+	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", "D:\\models\\sd-prompt-bot-3")
 
-	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", 1)
+	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5]
+
+	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", sys.argv[1])
 	bot.start()
-	#
-	# time.sleep(60 * 7)
-	# random.shuffle(pipe_line_holder_list)
-	# bot_2: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", 0)
-	# bot_2.start()
-
 	while True:
 		try:
 			time.sleep(1)
 		except KeyboardInterrupt:
 			logging.info('Shutdown')
 			bot.stop()
-			bot_2.stop()
 			exit(0)
-
-
-
-
-# class WebManager(threading.Thread):
-# 	def __init__(self, holder: [PipeLineHolder], proc_name: str):
-# 		super().__init__(name=proc_name, daemon=True)
-# 		self.message_broker_instance: QueueAdapter = QueueAdapter()
-# 		self.poll_for_message_worker_thread = threading.Thread(target=self.poll_for_reply_queue, args=(), daemon=True, name=proc_name)
-# 		self.holders: [PipeLineHolder] = holder
-#
-# 	def reply_to_thing(self, q: dict):
-# 		message_broker_instance = QueueAdapter()
-# 		print(f"Got reply: {q}")
-# 		data_dict = q
-# 		text = data_dict.get("Text")
-# 		prompt = data_dict.get("Prompt")
-# 		sender = data_dict.get("Sender")
-# 		topic = data_dict.get("Topic")
-# 		channel = data_dict.get("Channel")
-# 		comment_id = data_dict.get("CommentId")
-# 		connection_id = data_dict.get("ConnectionId")
-# 		out_queue = data_dict.get("ConnectionId")
-# 		reply = None
-# 		try:
-# 			current_holder: PipeLineHolder = random.choice(self.holders)
-# 			model = StableDiffusionPipeline.from_pretrained(current_holder.diffusion_pipeline_path, revision="fp16", torch_dtype=torch.float16, safety_checker=None)
-# 			upscaler = StableDiffusionLatentUpscalePipeline.from_pretrained("stabilityai/sd-x2-latent-upscaler", torch_dtype=torch.float16)
-# 			output_images, guidance, num_steps = FuckingStatic.create_image(prompt, model, "0", upscaler)
-# 			prompt = prompt + " " + "-model-name-" + current_holder.pipe_line_name + " " + "-num-steps-" + str(
-# 				num_steps) + " " + "-guidance-" + str(guidance)
-#
-# 			torch.cuda.empty_cache()
-# 			del model
-#
-# 			if output_images is not None:
-# 				local_path = f"D://images//{output_images}"
-# 				with open(local_path, "rb") as f:
-# 					image_data = f.read()
-# 					blob_adapter: BlobAdapter = BlobAdapter("images")
-# 					blob_adapter.upload_blob(data=image_data, blob_name=output_images)
-# 					final_remote_path = f"https://ajdevreddit.blob.core.windows.net/images/{output_images}"
-# 					reply = final_remote_path
-# 					print(final_remote_path)
-# 		except Exception as e:
-# 			del model
-# 			print(f":: Error generating reply: {e}")
-# 			reply = "I'm sorry, I'm not feeling well today. I'll be back later."
-# 			pass
-#
-# 		out_put = json.dumps(
-# 			{
-# 				"text": reply,
-# 				"prompt": prompt,
-# 				"sender": sender,
-# 				"commentId": comment_id,
-# 				"topic": topic,
-# 				"connectionId": connection_id,
-# 				"isBot": True,
-# 				"isThinking": False,
-# 				"channel": channel
-# 			}
-# 		)
-# 		try:
-# 			print(f":: Sending reply: {out_put}")
-# 			message_broker_instance.put_message(out_queue, out_put)
-# 		except Exception as e:
-# 			print(f":: Error putting message on queue: {e}")
-# 			print(f":: Error putting message on queue: {out_queue}")
-#
-# 	def poll_for_reply_queue(self):
-# 		while True:
-# 			try:
-# 				message: QueueMessage = self.message_broker_instance.get_message("chat-input")
-# 				if message is not None:
-# 					q = json.loads(message.content)
-# 					self.reply_to_thing(q)
-# 					self.message_broker_instance.delete_message("chat-input", message)
-# 					time.sleep(30)
-# 			except Exception as e:
-# 				print(f":: Error polling for reply queue: {e}")
-# 				pass
-# 			finally:
-# 				pass
-#
-# 	def run(self):
-# 		self.poll_for_message_worker_thread.start()
-#
-# 	def stop(self):
-# 		sys.exit(0)
