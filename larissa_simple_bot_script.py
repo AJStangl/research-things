@@ -60,7 +60,7 @@ class FuckingStatic:
 	@staticmethod
 	def create_enhanced_image(image_path) -> str:
 		out_path = "D:\\images\\results"
-
+		# return image_path
 		env_copy = os.environ.copy()
 		env_copy['CUDA_VISIBLE_DEVICES'] = "''"
 		print(f"Starting Script For Face Restoration for {image_path}")
@@ -262,7 +262,8 @@ class SimpleBot(threading.Thread):
 					"SexyDiffusion": "6c02c0aa-c116-11ed-a36b-625bab71eac2",
 					"MemeDiffusion": "52782e72-c116-11ed-8d42-9226dee3c916",
 					"CityDiffusion": "3f3db71e-c116-11ed-bc88-4257f93035d0",
-					"NatureDiffusion": "49b00d00-c116-11ed-80c5-7ef7afdcdf7d"
+					"NatureDiffusion": "49b00d00-c116-11ed-80c5-7ef7afdcdf7d",
+					"RedHeadDiffusion": "4b0844f8-c68c-11ed-8e01-0a0ff85df53d"
 				}
 
 				if holder.pipe_line_name == "MemeDiffusion":
@@ -315,7 +316,6 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-
 	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-3")
 
 	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-3")
@@ -326,7 +326,11 @@ if __name__ == '__main__':
 
 	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", "D:\\models\\sd-prompt-bot-3")
 
-	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5]
+	pipeline_6 = PipeLineHolder("RedHeadDiffusion", "D:\\models\\RedHeadDiffusion", "D:\\models\\sd-prompt-bot-4")
+
+	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5, pipeline_6]
+
+	random.shuffle(pipe_line_holder_list)
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", sys.argv[1])
 	bot.start()
