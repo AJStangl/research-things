@@ -263,7 +263,8 @@ class SimpleBot(threading.Thread):
 					"MemeDiffusion": "52782e72-c116-11ed-8d42-9226dee3c916",
 					"CityDiffusion": "3f3db71e-c116-11ed-bc88-4257f93035d0",
 					"NatureDiffusion": "49b00d00-c116-11ed-80c5-7ef7afdcdf7d",
-					"RedHeadDiffusion": "4b0844f8-c68c-11ed-8e01-0a0ff85df53d"
+					"RedHeadDiffusion": "4b0844f8-c68c-11ed-8e01-0a0ff85df53d",
+					"ITAPDiffusion": "548c5f8a-c70b-11ed-ab4c-d6ecb5af116d"
 				}
 
 				if holder.pipe_line_name == "MemeDiffusion":
@@ -316,19 +317,21 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-3")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-4")
 
-	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-3")
+	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-4")
 
-	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-3")
+	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-4")
 
-	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-3")
+	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-4")
 
-	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", "D:\\models\\sd-prompt-bot-3")
+	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", "D:\\models\\sd-prompt-bot-4")
 
-	pipeline_6 = PipeLineHolder("RedHeadDiffusion", "D:\\models\\RedHeadDiffusion", "D:\\models\\sd-prompt-bot-4")
+	pipeline_6 = PipeLineHolder("RedHeadDiffusion", "D:\\models\\RedHeadDiffusion-4", "D:\\models\\sd-prompt-bot-4")
 
-	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5, pipeline_6]
+	pipeline_7 = PipeLineHolder("ITAPDiffusion", "D:\\models\\ITAPDiffusion", "D:\\models\\sd-prompt-bot-4")
+
+	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5, pipeline_6, pipeline_7]
 
 	random.shuffle(pipe_line_holder_list)
 
