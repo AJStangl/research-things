@@ -43,3 +43,6 @@ training.txt
 /scripts/utility/spark/set_environ.py
 /shared_code/utility/spark/set_environ.py
 /notebooks/nb_use_cases/image_pipeline/client_secrets.json
+/notebooks/image-processing/client_secrets.json
+/notebooks/image-processing/setting.yaml
+/notebooks/image-processing/scratch.ipynb

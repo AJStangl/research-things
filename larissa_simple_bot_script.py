@@ -86,8 +86,10 @@ class FuckingStatic:
 	def create_image(prompt: str, pipe: StableDiffusionPipeline, device_name: str) -> (str, int, int):
 		try:
 			pipe.to("cuda:" + device_name)
-			guidance_scale = random.randint(5, 20)
-			num_inference_steps = random.randint(50, 200)
+			guidance_scale = random.randint(5, 12)
+			guidance_scale = random.randint(7, 8)
+			num_inference_steps = random.randint(50, 100)
+			num_inference_steps = random.randint(80, 81)
 			args = {
 				"model": pipe.config_name,
 				"guidance_scale": guidance_scale,
@@ -107,6 +109,8 @@ class FuckingStatic:
 			initial_image.save(image_path)
 
 			final_image = FuckingStatic.create_enhanced_image(image_path)
+
+			# final_image = image_path
 
 			return final_image, guidance_scale, num_inference_steps
 
@@ -239,13 +243,15 @@ class SimpleBot(threading.Thread):
 
 			reddit_text, image_prompt = self.create_prompt(holder)
 			print(":: Prompt Created")
+
 			image_prompt = image_prompt.replace("little girl", "petite women")
 
 			print("Reddit Text: " + reddit_text)
 
 			print("Prompt: " + image_prompt)
 
-			gen = f"{reddit_text}, {image_prompt}"
+			gen = f"{reddit_text} : {image_prompt}"
+			# gen = image_prompt
 
 			try:
 				(image_output, guidance, num_steps) = FuckingStatic.create_image(gen, pipe, str(self.instance))
@@ -264,16 +270,12 @@ class SimpleBot(threading.Thread):
 					"CityDiffusion": "3f3db71e-c116-11ed-bc88-4257f93035d0",
 					"NatureDiffusion": "49b00d00-c116-11ed-80c5-7ef7afdcdf7d",
 					"RedHeadDiffusion": "4b0844f8-c68c-11ed-8e01-0a0ff85df53d",
-					"ITAPDiffusion": "548c5f8a-c70b-11ed-ab4c-d6ecb5af116d"
+					"ITAPDiffusion": "548c5f8a-c70b-11ed-ab4c-d6ecb5af116d",
+					"SWFPetite": "494efcc6-ccbb-11ed-b813-aec5374833c4",
+					"FatSquirrelDiffusion": "331f2a78-ccef-11ed-b813-beb8ea0d6477",
+					"AsianOfficeLadyDiffusion": "0e69c05e-cf41-11ed-a6d7-c265ef3d634d",
+					"SexyAsianDiffusion": "e978fd72-d0cc-11ed-802d-922e8d939dd5"
 				}
-
-				if holder.pipe_line_name == "MemeDiffusion":
-					if self.counter % 2 == 0:
-						fuck = instance.subreddit("dankmemes")
-						fuck.submit_image(title=f"{reddit_text}", image_path=image_output, nsfw=False)
-						pass
-				else:
-					pass
 
 				submission: Submission = sub.submit_image(
 					title=f"{reddit_text}",
@@ -317,21 +319,38 @@ class SimpleBot(threading.Thread):
 
 if __name__ == '__main__':
 
-	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion-new", "D:\\models\\sd-prompt-bot-4")
+	prompt_model: str = "D:\\models\\sd-prompt-bot-7"
 
-	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", "D:\\models\\sd-prompt-bot-4")
+	pipeline_1 = PipeLineHolder("SexyDiffusion", "D:\\models\\SexyDiffusion", prompt_model)
 
-	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", "D:\\models\\sd-prompt-bot-4")
+	pipeline_2 = PipeLineHolder("NatureDiffusion", "D:\\models\\NatureDiffusion", prompt_model)
 
-	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", "D:\\models\\sd-prompt-bot-4")
+	pipeline_3 = PipeLineHolder("CityDiffusion", "D:\\models\\CityScapes", prompt_model)
 
-	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", "D:\\models\\sd-prompt-bot-4")
+	pipeline_4 = PipeLineHolder("CosmicDiffusion", "D:\\models\\CosmicDiffusion", prompt_model)
 
-	pipeline_6 = PipeLineHolder("RedHeadDiffusion", "D:\\models\\RedHeadDiffusion-4", "D:\\models\\sd-prompt-bot-4")
+	pipeline_5 = PipeLineHolder("MemeDiffusion", "D:\\models\\MemeDiffusion", prompt_model)
 
-	pipeline_7 = PipeLineHolder("ITAPDiffusion", "D:\\models\\ITAPDiffusion", "D:\\models\\sd-prompt-bot-4")
+	pipeline_6 = PipeLineHolder("RedHeadDiffusion", "D:\\models\\RedHeadDiffusion", prompt_model)
 
-	pipe_line_holder_list = [pipeline_1, pipeline_2, pipeline_3, pipeline_4, pipeline_5, pipeline_6, pipeline_7]
+	pipeline_7 = PipeLineHolder("ITAPDiffusion", "D:\\models\\ITAPDiffusion", prompt_model)
+
+	pipeline_8 = PipeLineHolder("SWFPetite", "D:\\models\\SWFPetite", prompt_model)
+
+	pipeline_9 = PipeLineHolder("FatSquirrelDiffusion", "D:\\models\\FatSquirrelDiffusion", prompt_model)
+
+	pipeline_10 = PipeLineHolder("AsianLadyDiffusion", "D:\\models\\SexyAsianDiffusion", prompt_model)
+
+	pipeline_11 = PipeLineHolder("AsianLadyDiffusion", "D:\\models\\AsianOfficeLadyDiffusion", prompt_model)
+
+
+	pipe_line_holder_list = [
+		pipeline_1, pipeline_2, pipeline_3, pipeline_4,
+		pipeline_5, pipeline_6, pipeline_7, pipeline_8,
+		pipeline_9, pipeline_10, pipeline_11
+	]
+
+	print(":: Starting Bot")
 
 	random.shuffle(pipe_line_holder_list)
 
