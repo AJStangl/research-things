@@ -274,7 +274,9 @@ class SimpleBot(threading.Thread):
 					"SWFPetite": "494efcc6-ccbb-11ed-b813-aec5374833c4",
 					"FatSquirrelDiffusion": "331f2a78-ccef-11ed-b813-beb8ea0d6477",
 					"AsianOfficeLadyDiffusion": "0e69c05e-cf41-11ed-a6d7-c265ef3d634d",
-					"SexyAsianDiffusion": "e978fd72-d0cc-11ed-802d-922e8d939dd5"
+					"SexyAsianDiffusion": "e978fd72-d0cc-11ed-802d-922e8d939dd5",
+					"MildlyPenisDiffusion": "7aedfca4-d676-11ed-9536-6a42b6ad77bd",
+					"TTTDiffusion": "25d50538-d6f7-11ed-9f0f-6a1b95511d30"
 				}
 
 				submission: Submission = sub.submit_image(
@@ -339,16 +341,23 @@ if __name__ == '__main__':
 
 	pipeline_9 = PipeLineHolder("FatSquirrelDiffusion", "D:\\models\\FatSquirrelDiffusion", prompt_model)
 
-	pipeline_10 = PipeLineHolder("AsianLadyDiffusion", "D:\\models\\SexyAsianDiffusion", prompt_model)
+	pipeline_10 = PipeLineHolder("SexyAsianDiffusion", "D:\\models\\SexyAsianDiffusion", prompt_model)
 
-	pipeline_11 = PipeLineHolder("AsianLadyDiffusion", "D:\\models\\AsianOfficeLadyDiffusion", prompt_model)
+	pipeline_11 = PipeLineHolder("AsianOfficeLadyDiffusion", "D:\\models\\AsianOfficeLadyDiffusion", prompt_model)
+
+	pipeline_12 = PipeLineHolder("MildlyPenisDiffusion", "D:\\models\\MildlyPenisDiffusion", prompt_model)
+
+	pipeline_13 = PipeLineHolder("TTTDiffusion", "D:\\models\\TTTDiffusion", prompt_model)
 
 
 	pipe_line_holder_list = [
 		pipeline_1, pipeline_2, pipeline_3, pipeline_4,
 		pipeline_5, pipeline_6, pipeline_7, pipeline_8,
-		pipeline_9, pipeline_10, pipeline_11
+		pipeline_9, pipeline_10, pipeline_11, pipeline_12,
+		pipeline_13
 	]
+
+	# pipe_line_holder_list = [pipeline_13]
 
 	print(":: Starting Bot")
 

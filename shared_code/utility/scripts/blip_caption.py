@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 import nltk
+import requests
 import torch
 from PIL import Image
 from nltk import TweetTokenizer, sent_tokenize
@@ -45,6 +46,17 @@ class BlipCaption:
 			out = self.model.generate(**inputs)
 			return self.processor.decode(out[0], skip_special_tokens=True, max_new_tokens=50)
 
+		except Exception as e:
+			print(e)
+			return ""
+
+	def caption_image_from_url(self, image_url: str):
+		try:
+			image = Image.open(requests.get(image_url, stream=True).raw)
+			inputs = self.processor(image, return_tensors="pt").to(self.device, torch.float16)
+
+			out = self.model.generate(**inputs)
+			return self.processor.decode(out[0], skip_special_tokens=True, max_new_tokens=50)
 		except Exception as e:
 			print(e)
 			return ""
