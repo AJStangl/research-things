@@ -86,9 +86,7 @@ class FuckingStatic:
 	def create_image(prompt: str, pipe: StableDiffusionPipeline, device_name: str) -> (str, int, int):
 		try:
 			pipe.to("cuda:" + device_name)
-			guidance_scale = random.randint(5, 12)
 			guidance_scale = random.randint(7, 8)
-			num_inference_steps = random.randint(50, 100)
 			num_inference_steps = random.randint(80, 81)
 			args = {
 				"model": pipe.config_name,
@@ -341,9 +339,7 @@ if __name__ == '__main__':
 
 	pipeline_9 = PipeLineHolder("FatSquirrelDiffusion", "D:\\models\\FatSquirrelDiffusion", prompt_model)
 
-	pipeline_10 = PipeLineHolder("SexyAsianDiffusion", "D:\\models\\SexyAsianDiffusion", prompt_model)
-
-	pipeline_11 = PipeLineHolder("AsianOfficeLadyDiffusion", "D:\\models\\AsianOfficeLadyDiffusion", prompt_model)
+	pipeline_10 = PipeLineHolder("SexyAsianDiffusion", "D:\\models\\AsianDiffusion", prompt_model)
 
 	pipeline_12 = PipeLineHolder("MildlyPenisDiffusion", "D:\\models\\MildlyPenisDiffusion", prompt_model)
 
@@ -351,16 +347,21 @@ if __name__ == '__main__':
 
 
 	pipe_line_holder_list = [
-		pipeline_1, pipeline_2, pipeline_3, pipeline_4,
-		pipeline_5, pipeline_6, pipeline_7, pipeline_8,
-		pipeline_9, pipeline_10, pipeline_11, pipeline_12,
-		pipeline_13
+		pipeline_1,
+		pipeline_2,
+		pipeline_3,
+		pipeline_4,
+		pipeline_5, #, pipeline_5, pipeline_5,
+		pipeline_6,
+		pipeline_7, #, pipeline_7, pipeline_7,
+		pipeline_8,
+		pipeline_9, #, pipeline_9, pipeline_9,  pipeline_9, pipeline_9,
+		pipeline_10,
+		pipeline_12 ,#, pipeline_12, pipeline_12, pipeline_12,
+		pipeline_13 #, pipeline_13, pipeline_13, pipeline_13, pipeline_13, pipeline_13
 	]
 
-	# pipe_line_holder_list = [pipeline_13]
-
 	print(":: Starting Bot")
-
 	random.shuffle(pipe_line_holder_list)
 
 	bot: SimpleBot = SimpleBot(pipe_line_holder_list, "SimpleBot", sys.argv[1])
