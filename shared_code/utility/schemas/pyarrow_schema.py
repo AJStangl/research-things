@@ -12,8 +12,10 @@ schema = pyarrow.schema(
 		pyarrow.field("original_url", pyarrow.string()),
 		pyarrow.field("image_name", pyarrow.string()),
 		pyarrow.field("path", pyarrow.string()),
-		pyarrow.field("thumbnail_path", pyarrow.string()),
+		pyarrow.field("model", pyarrow.string()),
 		pyarrow.field("exists", pyarrow.bool_()),
 		pyarrow.field("curated", pyarrow.bool_()),
+		pyarrow.field("accept", pyarrow.bool_()),
+		pyarrow.field("tags", pyarrow.list_(pyarrow.string()))
 	]
 )
